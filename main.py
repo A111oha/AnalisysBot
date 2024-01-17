@@ -4,31 +4,68 @@ import io
 import base64
 import telebot
 from telebot import types
+import re
 
 from Database import Database # Імпортуємо ваш клас Database з файлу database.py
 from Analysis import Analysis
-
 # Створюємо об'єкт бота з токеном, який отримали від @BotFather
 TOKEN = '6388346527:AAGsbSDQbQBuBV_OunDcJX_ORsIt_e0T9Ug'
 bot = telebot.TeleBot(TOKEN)
 # Створюємо об'єкт бази даних з параметрами підключення
 db = Database()
 analysis_instance = Analysis()
-
 # Визначаємо обробник команди /start, яка відправляє привітання
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+
+    # Початкові кнопки категорій
+    item_graphics = types.KeyboardButton("Графіки")
+    item_statistics = types.KeyboardButton("Статистика")
+
+    markup.add(item_graphics, item_statistics)
+
+    bot.reply_to(message, "Привіт, оберіть категорію:", reply_markup=markup)
+
+# Додаткові кнопки для категорії "Графіки"
+@bot.message_handler(func=lambda message: message.text.lower() == 'графіки')
+def graphics_category(message):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    item_sales_dynamics_chart = types.KeyboardButton("Графік динаміки продажів")
+    item_basket = types.KeyboardButton("Аналіз кошика")
+    item_user_country = types.KeyboardButton("Розподіл користувачів за країнами")
+    item_product_av = types.KeyboardButton("Доступність товарів за категоріями")
+    item_order_frequency = types.KeyboardButton("Частота замовлень")
+    item_prognose = types.KeyboardButton("Прогноз")
+
+    # Додайте кнопку "Повернутись"
+    item_back = types.KeyboardButton("Повернутись")
+    markup.add(item_sales_dynamics_chart, item_basket, item_user_country, item_product_av,
+               item_order_frequency,item_prognose, item_back)
+
+    bot.reply_to(message, "Оберіть графік для перегляду:", reply_markup=markup)
+# Додаткові кнопки для категорії "Статистика"
+@bot.message_handler(func=lambda message: message.text.lower() == 'статистика')
+def statistics_category(message):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+
     item_query = types.KeyboardButton("Інформація про товари")
     item_total_sales = types.KeyboardButton("Загальний обсяг продажів")
-    item_sales_dynamics_chart = types.KeyboardButton("Графік динаміки продажів")
     item_registered_users = types.KeyboardButton("Кількість користувачів")
     item_user_activity = types.KeyboardButton("Активність користувачів")
     item_most_popular = types.KeyboardButton("Найпопулярніше")
     item_profitability_turnover = types.KeyboardButton("Прибутковість та оборот")
 
-    markup.add(item_query, item_total_sales, item_sales_dynamics_chart, item_registered_users, item_user_activity, item_most_popular, item_profitability_turnover)
-    bot.reply_to(message, "Привіт, я телеграм бот, який взаємодіє з базою даних.", reply_markup=markup)
+    # Додайте кнопку "Повернутись"
+    item_back = types.KeyboardButton("Повернутись")
+    markup.add(item_query, item_total_sales, item_registered_users, item_user_activity, item_most_popular,
+               item_profitability_turnover, item_back)
+
+    bot.reply_to(message, "Оберіть статистичний запит:", reply_markup=markup)
+
+@bot.message_handler(func=lambda message: message.text.lower() == 'повернутись')
+def return_to_start(message):
+    send_welcome(message)
 
 # Визначаємо обробник команди query, яка виконує запит до бази даних і відправляє результат
 @bot.message_handler(func=lambda message: message.text.lower() == 'інформація про товари')
@@ -41,13 +78,13 @@ def execute_query(message):
     bot.reply_to(message, result_str)
 
 # Визначаємо обробник команди total_sales
-@bot.message_handler(func=lambda message: message.text.lower() == 'Загальний обсяг продажів')
+@bot.message_handler(func=lambda message: message.text.lower() == 'загальний обсяг продажів')
 def total_sales_command(message):
     # Викликаємо метод total_sales з класу Analysis
     start_date = "2023-06-11"
-    end_date = "2023-06-14"
+    end_date = "2024-01-13"
     total_sales_result = analysis_instance.total_sales(start_date, end_date)
-    bot.reply_to(message, f"Загальний обсяг продажів за період: {total_sales_result}")
+    bot.reply_to(message, f"Загальний обсяг продажів за період з {start_date} по {end_date}: {total_sales_result}")
 
 # Визначаємо обробник команди sales_dynamics_chart
 @bot.message_handler(func=lambda message: message.text.lower() == 'графік динаміки продажів')
@@ -60,14 +97,14 @@ def sales_dynamics_chart_command(message):
     bot.reply_to(message, "Побудовано графік динаміки продажів.")
 
 # Визначаємо обробник команди total_registered_users
-@bot.message_handler(func=lambda message: message.text.lower() == 'Кількість користувачів')
+@bot.message_handler(func=lambda message: message.text.lower() == 'кількість користувачів')
 def total_registered_users_command(message):
     # Викликаємо метод total_registered_users з класу Analysis
     total_users = analysis_instance.total_registered_users()
     # Відправляємо результат користувачеві
     bot.reply_to(message, f"кількість  користувачів: {total_users}")
 
-@bot.message_handler(func=lambda message: message.text.lower() == 'Активність користувачів')
+@bot.message_handler(func=lambda message: message.text.lower() == 'активність користувачів')
 def user_activity_command(message):
     # Викликаємо метод user_activity з класу Analysis
     user_activity_result = analysis_instance.user_activity()
@@ -76,7 +113,7 @@ def user_activity_command(message):
     # Відправляємо результат користувачеві
     bot.reply_to(message, user_activity_result)
 
-@bot.message_handler(func=lambda message: message.text.lower() == 'Найпопулярніше')
+@bot.message_handler(func=lambda message: message.text.lower() == 'найпопулярніше')
 def most_popular_command(message):
     result_manufacturers, result_categories = analysis_instance.most_popular_manufacturers_and_categories()
 
@@ -91,7 +128,7 @@ def most_popular_command(message):
     bot.send_message(message.chat.id, message_text)
 
 
-@bot.message_handler(func=lambda message: message.text.lower() == 'Прибутковість та оборот')
+@bot.message_handler(func=lambda message: message.text.lower() == 'прибутковість та оборот')
 def profitability_and_turnover_command(message):
     result_manufacturers, result_categories = analysis_instance.profitability_and_turnover_comparison()
 
@@ -109,9 +146,40 @@ def profitability_and_turnover_command(message):
 
     # Виводимо результат у телеграм-чат
     bot.send_message(message.chat.id, message_text)
+@bot.message_handler(func=lambda message: message.text.lower() == 'аналіз кошика')
+def basket_command(message):
+    buffer = analysis_instance.basket_analysis()
+    bot.send_photo(message.chat.id, photo=buffer)
 
 
+@bot.message_handler(func=lambda message: message.text.lower() == 'розподіл користувачів за країнами')
+def user_country_command(message):
+    buffer = analysis_instance.user_country_distribution()
+    bot.send_photo(message.chat.id, photo=buffer)
 
+@bot.message_handler(func=lambda message: message.text.lower() == 'доступність товарів за категоріями')
+def product_availability_command(message):
+    buffer = analysis_instance.product_availability_chart()
+    bot.send_photo(message.chat.id, photo=buffer)
+
+@bot.message_handler(func=lambda message: message.text.lower() == 'частота замовлень')
+def order_frequency_command(message):
+    buffer = analysis_instance.user_order_frequency_chart()
+    bot.send_photo(message.chat.id, photo=buffer)
+
+@bot.message_handler(func=lambda message: message.text.lower() == 'прогноз')
+def prognose_command(message):
+    df = analysis_instance.fetch_data()
+    model = analysis_instance.train_model(df)
+    forecast_df = analysis_instance.forecast_future_sales(model, df, num_days=30)
+
+    buffer_actual, buffer_forecast = analysis_instance.plot_results(df, forecast_df)
+
+    # Відправка фото для поточних продаж
+    bot.send_photo(message.chat.id, photo=buffer_actual)
+
+    # Відправка фото для прогнозованих продаж
+    bot.send_photo(message.chat.id, photo=buffer_forecast)
 # Запускаємо бота, щоб він слухав повідомлення
 bot.polling()
 
