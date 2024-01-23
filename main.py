@@ -5,15 +5,21 @@ import base64
 import telebot
 from telebot import types
 import re
+import bcrypt
+from datetime import datetime
+import hashlib
 
 from Database import Database # Імпортуємо ваш клас Database з файлу database.py
 from Analysis import Analysis
+from Operations import Operations
+
 # Створюємо об'єкт бота з токеном, який отримали від @BotFather
 TOKEN = '6388346527:AAGsbSDQbQBuBV_OunDcJX_ORsIt_e0T9Ug'
 bot = telebot.TeleBot(TOKEN)
 # Створюємо об'єкт бази даних з параметрами підключення
 db = Database()
 analysis_instance = Analysis()
+operations_instance = Operations()
 # Визначаємо обробник команди /start, яка відправляє привітання
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -22,8 +28,9 @@ def send_welcome(message):
     # Початкові кнопки категорій
     item_graphics = types.KeyboardButton("Графіки")
     item_statistics = types.KeyboardButton("Статистика")
+    item_operations = types.KeyboardButton("Операції над сайтом")
 
-    markup.add(item_graphics, item_statistics)
+    markup.add(item_graphics, item_statistics, item_operations)
 
     bot.reply_to(message, "Привіт, оберіть категорію:", reply_markup=markup)
 
@@ -49,7 +56,7 @@ def graphics_category(message):
 def statistics_category(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
 
-    item_query = types.KeyboardButton("Інформація про товари")
+    item_query = types.KeyboardButton("Список категорій")
     item_total_sales = types.KeyboardButton("Загальний обсяг продажів")
     item_registered_users = types.KeyboardButton("Кількість користувачів")
     item_user_activity = types.KeyboardButton("Активність користувачів")
@@ -62,13 +69,23 @@ def statistics_category(message):
                item_profitability_turnover, item_back)
 
     bot.reply_to(message, "Оберіть статистичний запит:", reply_markup=markup)
+@bot.message_handler(func=lambda message: message.text.lower() == 'операції над сайтом')
+def operation_category(message):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    item_add_admin = types.KeyboardButton("Додати адміністратора")
 
+
+    # Додайте кнопку "Повернутись"
+    item_back = types.KeyboardButton("Повернутись")
+    markup.add(item_add_admin, item_back)
+
+    bot.reply_to(message, "Оберіть операцію:", reply_markup=markup)
 @bot.message_handler(func=lambda message: message.text.lower() == 'повернутись')
 def return_to_start(message):
     send_welcome(message)
 
 # Визначаємо обробник команди query, яка виконує запит до бази даних і відправляє результат
-@bot.message_handler(func=lambda message: message.text.lower() == 'інформація про товари')
+@bot.message_handler(func=lambda message: message.text.lower() == 'список категорій')
 def execute_query(message):
     # Виконуємо запит за допомогою методу execute_query класу Database
     result = db.execute_query("SELECT * FROM Category")
@@ -95,7 +112,6 @@ def sales_dynamics_chart_command(message):
     bot.send_photo(message.chat.id, photo=buffer)
     # Відправляємо повідомлення про успішне побудовання графіку
     bot.reply_to(message, "Побудовано графік динаміки продажів.")
-
 # Визначаємо обробник команди total_registered_users
 @bot.message_handler(func=lambda message: message.text.lower() == 'кількість користувачів')
 def total_registered_users_command(message):
@@ -172,14 +188,47 @@ def prognose_command(message):
     df = analysis_instance.fetch_data()
     model = analysis_instance.train_model(df)
     forecast_df = analysis_instance.forecast_future_sales(model, df, num_days=30)
-
     buffer_actual, buffer_forecast = analysis_instance.plot_results(df, forecast_df)
-
     # Відправка фото для поточних продаж
     bot.send_photo(message.chat.id, photo=buffer_actual)
-
     # Відправка фото для прогнозованих продаж
     bot.send_photo(message.chat.id, photo=buffer_forecast)
+
+@bot.message_handler(func=lambda message: message.text.lower() == 'додати адміністратора')
+def add_admin_command(message):
+    try:
+        # Виводимо повідомлення з порядком вводу значень
+        bot.send_message(message.chat.id, "Будь ласка, введіть дані адміністратора в наступному порядку:\n"
+                                          "Ім'я Прізвище Країна Місто Логін\n"
+                                          "Наприклад: John Doe USA New York john_doe")
+
+        # Чекаємо на введення даних користувачем
+        bot.register_next_step_handler(message, process_admin_data)
+
+    except Exception as e:
+        bot.reply_to(message, f"Помилка при додаванні адміністратора: {e}")
+
+
+def process_admin_data(message):
+    try:
+        # Отримуємо дані від користувача
+        data = message.text.split()
+        # Розпаковуємо дані
+        first_name, last_name, country, city, login = data
+        acess =1
+        # Генеруємо випадковий пароль
+        generated_password = operations_instance.generate_random_password()
+        # Шифруємо пароль з використанням bcrypt
+        hashed_password = hashlib.md5(generated_password.encode('utf-8')).hexdigest()
+        # Отримуємо поточну дату
+        register_date = datetime.now().strftime("%Y-%m-%d")
+        operations_instance.add_user(first_name, last_name, hashed_password, country, city, acess, login, register_date)
+        bot.reply_to(message,
+                     f"Адміністратор {first_name} {last_name} доданий успішно. Згенерований пароль: {generated_password}")
+    except Exception as e:
+        bot.reply_to(message, f"Помилка при додаванні адміністратора: {e}")
+
+
 # Запускаємо бота, щоб він слухав повідомлення
 bot.polling()
 
