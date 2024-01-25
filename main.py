@@ -1,20 +1,17 @@
 # Імпортуємо необхідні бібліотеки
-import os
-import io
-import base64
+
 import telebot
 from telebot import types
-import re
-import bcrypt
 from datetime import datetime
 import hashlib
-
-from Database import Database # Імпортуємо ваш клас Database з файлу database.py
+from Database import Database
 from Analysis import Analysis
 from Operations import Operations
+import os
+from dotenv import load_dotenv
 
-# Створюємо об'єкт бота з токеном, який отримали від @BotFather
-TOKEN = '6388346527:AAGsbSDQbQBuBV_OunDcJX_ORsIt_e0T9Ug'
+load_dotenv()
+TOKEN =os.getenv('TOKEN')
 bot = telebot.TeleBot(TOKEN)
 # Створюємо об'єкт бази даних з параметрами підключення
 db = Database()
@@ -24,11 +21,10 @@ operations_instance = Operations()
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-
     # Початкові кнопки категорій
     item_graphics = types.KeyboardButton("Графіки")
     item_statistics = types.KeyboardButton("Статистика")
-    item_operations = types.KeyboardButton("Операції над сайтом")
+    item_operations = types.KeyboardButton("Операції")
 
     markup.add(item_graphics, item_statistics, item_operations)
 
@@ -69,7 +65,7 @@ def statistics_category(message):
                item_profitability_turnover, item_back)
 
     bot.reply_to(message, "Оберіть статистичний запит:", reply_markup=markup)
-@bot.message_handler(func=lambda message: message.text.lower() == 'операції над сайтом')
+@bot.message_handler(func=lambda message: message.text.lower() == 'операції')
 def operation_category(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     item_add_admin = types.KeyboardButton("Додати адміністратора")
@@ -118,15 +114,13 @@ def total_registered_users_command(message):
     # Викликаємо метод total_registered_users з класу Analysis
     total_users = analysis_instance.total_registered_users()
     # Відправляємо результат користувачеві
-    bot.reply_to(message, f"кількість  користувачів: {total_users}")
+    bot.reply_to(message, f"Кількість  користувачів: {total_users}")
 
 @bot.message_handler(func=lambda message: message.text.lower() == 'активність користувачів')
 def user_activity_command(message):
     # Викликаємо метод user_activity з класу Analysis
     user_activity_result = analysis_instance.user_activity()
-    # Форматуємо результат у рядок, розділяючи значення комами
-    #result_str = "\n".join([" ".join(map(str, row)) for row in user_activity_result])
-    # Відправляємо результат користувачеві
+
     bot.reply_to(message, user_activity_result)
 
 @bot.message_handler(func=lambda message: message.text.lower() == 'найпопулярніше')
@@ -204,29 +198,30 @@ def add_admin_command(message):
 
         # Чекаємо на введення даних користувачем
         bot.register_next_step_handler(message, process_admin_data)
-
     except Exception as e:
         bot.reply_to(message, f"Помилка при додаванні адміністратора: {e}")
-
-
 def process_admin_data(message):
     try:
         # Отримуємо дані від користувача
         data = message.text.split()
         # Розпаковуємо дані
         first_name, last_name, country, city, login = data
-        acess =1
+        access = 1
         # Генеруємо випадковий пароль
         generated_password = operations_instance.generate_random_password()
         # Шифруємо пароль з використанням bcrypt
         hashed_password = hashlib.md5(generated_password.encode('utf-8')).hexdigest()
         # Отримуємо поточну дату
         register_date = datetime.now().strftime("%Y-%m-%d")
-        operations_instance.add_user(first_name, last_name, hashed_password, country, city, acess, login, register_date)
-        bot.reply_to(message,
-                     f"Адміністратор {first_name} {last_name} доданий успішно. Згенерований пароль: {generated_password}")
+        if(operations_instance.check_user_existence(login)):
+            bot.reply_to(message, f"Користувач із логіном {login} вже існує.")
+        else:
+            operations_instance.add_user(first_name, last_name, hashed_password, country, city, access, login,
+                                         register_date)
+            bot.reply_to(message,
+                         f"Адміністратор {first_name} {last_name} доданий успішно. Згенерований пароль: {generated_password}")
     except Exception as e:
-        bot.reply_to(message, f"Помилка при додаванні адміністратора: {e}")
+        print(f"Помилка при додаванні адміністратора: {e}")
 
 
 # Запускаємо бота, щоб він слухав повідомлення

@@ -14,25 +14,17 @@ class Database:
         result = cursor.fetchall()
         return result
 
-    # def insert_data(self, table, data):
-    #     cursor = self.connection.cursor()
-    #     query = f"INSERT INTO {table} VALUES ({data})"
-    #     cursor.execute(query)
-    #     self.connection.commit()
 
     def commit_query(self, query, params=None):
         cursor = self.connection.cursor()
-
         if params:
             cursor.execute(query, params)
         else:
             cursor.execute(query)
-
         self.connection.commit()
     def insert_data(self, table, columns, values):
         """
         Метод для вставки даних в таблицю.
-
         :param table: Назва таблиці.
         :param columns: Список назв стовпців, у які ви хочете вставити дані.
         :param values: Список значень, які ви хочете вставити в відповідні стовпці.
