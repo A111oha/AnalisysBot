@@ -7,6 +7,7 @@ import hashlib
 from Database import Database
 from Analysis import Analysis
 from Operations import Operations
+from Parser import Parser
 import os
 from dotenv import load_dotenv
 
@@ -17,6 +18,9 @@ bot = telebot.TeleBot(TOKEN)
 db = Database()
 analysis_instance = Analysis()
 operations_instance = Operations()
+parser_instance = Parser()
+
+
 # Визначаємо обробник команди /start, яка відправляє привітання
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -69,11 +73,13 @@ def statistics_category(message):
 def operation_category(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     item_add_admin = types.KeyboardButton("Додати адміністратора")
+    item_delete_admin = types.KeyboardButton("Видалити адміністратора")
+    item_parse= types.KeyboardButton("Парсити")
 
 
     # Додайте кнопку "Повернутись"
     item_back = types.KeyboardButton("Повернутись")
-    markup.add(item_add_admin, item_back)
+    markup.add(item_add_admin, item_delete_admin,item_parse, item_back)
 
     bot.reply_to(message, "Оберіть операцію:", reply_markup=markup)
 @bot.message_handler(func=lambda message: message.text.lower() == 'повернутись')
@@ -204,6 +210,10 @@ def process_admin_data(message):
     try:
         # Отримуємо дані від користувача
         data = message.text.split()
+        # Перевіряємо, чи користувач ввів усі необхідні поля
+        if len(data) != 5:
+            bot.reply_to(message, "Будь ласка, введіть всі необхідні поля.")
+            return
         # Розпаковуємо дані
         first_name, last_name, country, city, login = data
         access = 1
@@ -223,7 +233,46 @@ def process_admin_data(message):
     except Exception as e:
         print(f"Помилка при додаванні адміністратора: {e}")
 
+@bot.message_handler(func=lambda message: message.text.lower() == 'видалити адміністратора')
+def delete_admin_command(message):
+    try:
+        # Виводимо повідомлення з порядком вводу значень
+        bot.send_message(message.chat.id, "Будь ласка, введіть логін адміністратора")
+        # Чекаємо на введення даних користувачем
+        bot.register_next_step_handler(message, process_admin_data_del)
+    except Exception as e:
+        print(f"Помилка при видаленні адміністратора: {e}")
+def process_admin_data_del(message):
+    try:
+        # Отримуємо дані від користувача
+        data = message.text
+        login = data
+        if(operations_instance.check_user_existence(login)):
+            operations_instance.delete_user(login)
+            bot.reply_to(message,
+                         f"Адміністратора {login} успішно видалено")
+        else:
+            bot.reply_to(message, f"Користувач із логіном {login} не існує.")
 
+    except Exception as e:
+        print(f"Помилка при видаленні адміністратора: {e}")
+
+@bot.message_handler(func=lambda message: message.text.lower() == 'парсити')
+def parse(message):
+    try:
+        url_to_parse = 'https://rozetka.com.ua/ua/fishing/c84703/'
+        parsed_data = parser_instance.parse_website(url_to_parse)
+        bot.send_message(message.chat.id, "5 Найпопулярніших товарів на інших сайтах:")
+
+        # Відправляємо зібрані дані користувачеві
+        for i, data in enumerate(parsed_data):
+            response_text = f"{i + 1}.\nUrl - {data['url']}\nName - {data['name']}\nPrice - {data['price']}\n\n"
+            bot.send_message(message.chat.id, response_text)
+    except Exception as e:
+        print(f"Помилка при парсингу: {e}")
+@bot.message_handler(func=lambda message: True)
+def unknown_command(message):
+    bot.reply_to(message, "Вибачте, але я поки не знаю цю команду. Спробуйте іншу команду.")
 # Запускаємо бота, щоб він слухав повідомлення
 bot.polling()
 
