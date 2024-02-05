@@ -74,7 +74,7 @@ def operation_category(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     item_add_admin = types.KeyboardButton("Додати адміністратора")
     item_delete_admin = types.KeyboardButton("Видалити адміністратора")
-    item_parse= types.KeyboardButton("Парсити")
+    item_parse= types.KeyboardButton("Популярне")
 
 
     # Додайте кнопку "Повернутись"
@@ -257,7 +257,7 @@ def process_admin_data_del(message):
     except Exception as e:
         print(f"Помилка при видаленні адміністратора: {e}")
 
-@bot.message_handler(func=lambda message: message.text.lower() == 'парсити')
+@bot.message_handler(func=lambda message: message.text.lower() == 'популярне')
 def parse(message):
     try:
         url_to_parse = 'https://rozetka.com.ua/ua/fishing/c84703/'
